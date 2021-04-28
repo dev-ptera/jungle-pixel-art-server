@@ -2,6 +2,7 @@ import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { getAccountInfo } from '../rpc/account-info';
 import { getAccountHistory } from '../rpc/account-history';
 import { makeKey, sleep } from './util';
+import {getPending} from "../rpc/pending";
 
 const MAX_ATTEMPTS = 60;
 
@@ -79,10 +80,17 @@ const _pollForPayment = async (paymentAddr, rawPaymentAmount, minBlock): Promise
             throw new Error('payment timeout');
         }
         await sleep(2000);
-        getAccountHistory(paymentAddr)
+
+        await getAccountHistory(paymentAddr, minBlock)
             .then((history) => {
+                console.log(history);
+                console.log(rawPaymentAmount);
+                console.log('\n\n\n');
+
                 for (const block of history) {
                     if (block.type === 'receive' && block.amount === rawPaymentAmount) {
+                        console.log('discovered block!');
+                        isPaid = true;
                         return Promise.resolve();
                     }
                     if (block.block_count <= minBlock) {
@@ -92,6 +100,7 @@ const _pollForPayment = async (paymentAddr, rawPaymentAmount, minBlock): Promise
             })
             .catch((err) => {
                 console.error(err);
+                throw new Error('cannot find account history');
             });
     }
 };
@@ -115,18 +124,22 @@ export const checkout = async (ws, msg, board): Promise<void> => {
     try {
         const pending = _parseMsg(msg);
         const redrawn = _checkRedrawn(pending, board);
-
         if (redrawn.size > 0) {
             _handleRedrawn(ws, redrawn);
         }
-
         const rawPaymentAmount = await _convertAmountToRaw(pending.size);
-        const paymentAddr = 'ban_1ifabmn4heheu1jr6mffaosqazr7cgfi7bcfwk8ahb9f3di4qhie45fz4rea';
+        const paymentAddr = 'ban_1h73pziojtds9yqj1c4ja853r8zmpee9sh4uhw6u69qnpdmpbbhmgy1xs7ob';
+       // const paymentAddr = 'ban_1ifabmn4heheu1jr6mffaosqazr7cgfi7bcfwk8ahb9f3di4qhie45fz4rea';
         const startBlockCount = await _getBlockCount(paymentAddr);
-
         _sendPaymentAddress(ws, paymentAddr, rawPaymentAmount);
         await _pollForPayment(paymentAddr, rawPaymentAmount, startBlockCount);
         _saveBoard(ws, pending, board);
+        ws.send(
+            JSON.stringify({
+                success: 'true',
+            })
+        );
+        return Promise.resolve();
     } catch (err) {
         ws.send(
             JSON.stringify({
