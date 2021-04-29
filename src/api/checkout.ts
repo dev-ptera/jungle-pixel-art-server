@@ -1,9 +1,9 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
-import { getAccountInfo } from '../rpc/account-info';
-import { getAccountHistory } from '../rpc/account-history';
-import { makeKey, sleep } from './util';
-import {PAYMENT_ADDRESSES} from "../app.config";
-import {PENDING_PAYMENTS} from "../app";
+import { makeKey } from './util';
+import { PAYMENT_ADDRESSES, PENDING_PAYMENTS } from '../app.config';
+import { Observable } from 'rxjs';
+import { newBlocksSubject } from './poll';
+import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 
 const MAX_ATTEMPTS = 60;
 
@@ -30,14 +30,9 @@ const _checkRedrawn = (pending: Map<string, string>, board: Map<string, string>)
 };
 
 // Called if there are conflicting edits.
-const _handleRedrawn = (ws, redrawn: Map<string, string>): void => {
-    ws.send(
-        JSON.stringify({
-            error: 'redraw',
-        })
-    );
-    throw new Error('conflicting pixelboard during checkout');
-    ws.close();
+const _handleRedrawn = (redrawn: Map<string, string>): void => {
+    // NEED TO SEND BACK PIXELS BACK TO ERASE
+    throw new Error(CONFLICTING_PIXEL_BOARD);
 };
 
 const _convertAmountToRaw = (amount): Promise<string> => {
@@ -56,16 +51,7 @@ const _getPaymentAddress = (amount: string): string => {
             return addr;
         }
     }
-    throw new Error('payment sets are full');
-};
-
-const _getBlockCount = (addr): Promise<number> => {
-    return getAccountInfo(addr)
-        .then((accountInfo) => Promise.resolve(accountInfo.block_count))
-        .catch((err) => {
-            console.error(err);
-            throw new Error('cannot fetch block');
-        });
+    throw new Error(PAYMENT_SETS_FULL);
 };
 
 // Return payment addr blockcount when begin request payment.
@@ -78,43 +64,21 @@ const _sendPaymentAddress = (ws, addr, amount): void => {
     );
 };
 
-// Listens for receiving payment.
-// Every second, check generated receiving address for pending balance.
-// If correct amount has been sent, generate receive block to confirm. (This allows for future payments to same address/amount pair).
-// Save pixels to database
-const _pollForPayment = async (paymentAddr, rawPaymentAmount, minBlock): Promise<void> => {
-    let isPaid = false;
-    let attempts = 0;
-    while (!isPaid) {
-        console.log('checking for payment');
-        if (++attempts > MAX_ATTEMPTS) {
-            console.log('payment timeout');
-            throw new Error('payment timeout');
-        }
-        await sleep(2000);
-
-        await getAccountHistory(paymentAddr, minBlock)
-            .then((history) => {
-                console.log(history);
-                console.log(rawPaymentAmount);
-                console.log('\n');
-
-                for (const block of history) {
+const _listenForIncomingBlocks = (paymentAddr, rawPaymentAmount): Observable<void> => {
+    return new Observable((event) => {
+        const subject = newBlocksSubject.subscribe((history) => {
+            if (history.account === paymentAddr) {
+                for (const block of history.history) {
                     if (block.type === 'receive' && block.amount === rawPaymentAmount) {
-                        console.log('discovered block!');
-                        isPaid = true;
-                        return Promise.resolve();
-                    }
-                    if (block.block_count <= minBlock) {
+                        console.log(`[INFO]: Payment received! ${paymentAddr} ${rawPaymentAmount} ${block.height}`);
+                        event.next();
+                        subject.unsubscribe();
                         break;
                     }
                 }
-            })
-            .catch((err) => {
-                console.error(err);
-                throw new Error('cannot find account history');
-            });
-    }
+            }
+        });
+    });
 };
 
 const _saveBoard = (ws, pending: Map<string, string>, board): void => {
@@ -132,27 +96,39 @@ const _clearPendingPayment = (addr: string, rawAmount: string): void => {
     if (PENDING_PAYMENTS[addr] && PENDING_PAYMENTS[addr].has(rawAmount)) {
         PENDING_PAYMENTS[addr].delete(rawAmount);
     }
-}
+};
 
-export const checkout = async (ws, msg, board): Promise<void> => {
+export const checkout = async (ws, msg, board, closeSubject): Promise<void> => {
     let paymentAddr;
     let rawPaymentAmount;
+    let paymentSubscription;
+
     try {
+        closeSubject.subscribe(() => {
+            console.log('[INFO]: Web socket closed, canceling transaction.');
+            closeSubject.unsubscribe();
+            _clearPendingPayment(paymentAddr, rawPaymentAmount);
+        });
+
         const pending = _parseMsg(msg);
         const redrawn = _checkRedrawn(pending, board);
         if (redrawn.size > 0) {
-            _handleRedrawn(ws, redrawn);
+            _handleRedrawn(redrawn);
         }
         rawPaymentAmount = await _convertAmountToRaw(pending.size);
         paymentAddr = _getPaymentAddress(rawPaymentAmount);
-        const startBlockCount = await _getBlockCount(paymentAddr);
         _sendPaymentAddress(ws, paymentAddr, rawPaymentAmount);
-        await _pollForPayment(paymentAddr, rawPaymentAmount, startBlockCount);
-        _saveBoard(ws, pending, board);
-        _clearPendingPayment(paymentAddr, rawPaymentAmount);
-        return Promise.resolve();
+        paymentSubscription = _listenForIncomingBlocks(paymentAddr, rawPaymentAmount).subscribe(() => {
+            _saveBoard(ws, pending, board);
+            _clearPendingPayment(paymentAddr, rawPaymentAmount);
+            paymentSubscription.unsubscribe();
+            return Promise.resolve();
+        });
     } catch (err) {
         _clearPendingPayment(paymentAddr, rawPaymentAmount);
+        if (paymentSubscription) {
+            paymentSubscription.unsubscribe();
+        }
         ws.send(
             JSON.stringify({
                 error: err.message,

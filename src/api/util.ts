@@ -1,4 +1,4 @@
-import {PAYMENT_ADDRESSES} from "../app.config";
+import { PAYMENT_ADDRESSES } from '../app.config';
 
 export const sleep = (ms) =>
     new Promise((resolve) => {
@@ -13,4 +13,4 @@ export const initPendingPaymentSets = (): Array<Set<string>> => {
         pendingPayments[paymentAddr] = new Set<string>();
     }
     return pendingPayments;
-}
+};

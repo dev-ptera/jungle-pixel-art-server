@@ -1,4 +1,5 @@
 import { NanoClient } from '@dev-ptera/nano-node-rpc';
+import { initPendingPaymentSets } from './api/util';
 
 const args = process.argv.slice(2);
 
@@ -11,4 +12,6 @@ export const PAYMENT_ADDRESSES = [
     'ban_1h73pziojtds9yqj1c4ja853r8zmpee9sh4uhw6u69qnpdmpbbhmgy1xs7ob',
     'ban_1ifabmn4heheu1jr6mffaosqazr7cgfi7bcfwk8ahb9f3di4qhie45fz4rea',
     'ban_1y13ox5cekr3phidh8463thu8p3ii6gh17zph8hf1ssdynmssxpu7emxpekw',
-]
+];
+
+export const PENDING_PAYMENTS = initPendingPaymentSets();
