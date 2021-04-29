@@ -3,7 +3,7 @@ import * as cors from 'cors';
 import * as expressWs from 'express-ws';
 import { isProduction, URL_WHITE_LIST } from './app.config';
 import { checkout } from './api/checkout';
-import { makeKey } from './api/util';
+import {initPendingPaymentSets, makeKey} from './api/util';
 
 const http = require('http');
 const appBase = express();
@@ -21,6 +21,7 @@ const corsOptions = {
 };
 
 const drawnPixels = new Map<string, string>();
+export const PENDING_PAYMENTS = initPendingPaymentSets();
 
 drawnPixels.set(makeKey(115, 451), '#259a36');
 drawnPixels.set(makeKey(145, 463), '#259a36');
@@ -45,6 +46,8 @@ app.ws('/payment', (ws) => {
         console.log('WebSocket was closed');
     });
 });
+
+
 
 const port = process.env.PORT || 3000;
 const server = http.createServer(app).listen(port, () => {

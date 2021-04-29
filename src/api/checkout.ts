@@ -2,7 +2,8 @@ import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { getAccountInfo } from '../rpc/account-info';
 import { getAccountHistory } from '../rpc/account-history';
 import { makeKey, sleep } from './util';
-import {getPending} from "../rpc/pending";
+import {PAYMENT_ADDRESSES} from "../app.config";
+import {PENDING_PAYMENTS} from "../app";
 
 const MAX_ATTEMPTS = 60;
 
@@ -48,6 +49,16 @@ const _convertAmountToRaw = (amount): Promise<string> => {
         });
 };
 
+const _getPaymentAddress = (amount: string): string => {
+    for (const addr of PAYMENT_ADDRESSES) {
+        if (!PENDING_PAYMENTS[addr].has(amount)) {
+            PENDING_PAYMENTS[addr].add(amount);
+            return addr;
+        }
+    }
+    throw new Error('payment sets are full');
+};
+
 const _getBlockCount = (addr): Promise<number> => {
     return getAccountInfo(addr)
         .then((accountInfo) => Promise.resolve(accountInfo.block_count))
@@ -77,6 +88,7 @@ const _pollForPayment = async (paymentAddr, rawPaymentAmount, minBlock): Promise
     while (!isPaid) {
         console.log('checking for payment');
         if (++attempts > MAX_ATTEMPTS) {
+            console.log('payment timeout');
             throw new Error('payment timeout');
         }
         await sleep(2000);
@@ -85,7 +97,7 @@ const _pollForPayment = async (paymentAddr, rawPaymentAmount, minBlock): Promise
             .then((history) => {
                 console.log(history);
                 console.log(rawPaymentAmount);
-                console.log('\n\n\n');
+                console.log('\n');
 
                 for (const block of history) {
                     if (block.type === 'receive' && block.amount === rawPaymentAmount) {
@@ -116,31 +128,31 @@ const _saveBoard = (ws, pending: Map<string, string>, board): void => {
     );
 };
 
-// Shared map for pending transactions
-//
-// raw -> address
+const _clearPendingPayment = (addr: string, rawAmount: string): void => {
+    if (PENDING_PAYMENTS[addr] && PENDING_PAYMENTS[addr].has(rawAmount)) {
+        PENDING_PAYMENTS[addr].delete(rawAmount);
+    }
+}
 
 export const checkout = async (ws, msg, board): Promise<void> => {
+    let paymentAddr;
+    let rawPaymentAmount;
     try {
         const pending = _parseMsg(msg);
         const redrawn = _checkRedrawn(pending, board);
         if (redrawn.size > 0) {
             _handleRedrawn(ws, redrawn);
         }
-        const rawPaymentAmount = await _convertAmountToRaw(pending.size);
-        const paymentAddr = 'ban_1h73pziojtds9yqj1c4ja853r8zmpee9sh4uhw6u69qnpdmpbbhmgy1xs7ob';
-       // const paymentAddr = 'ban_1ifabmn4heheu1jr6mffaosqazr7cgfi7bcfwk8ahb9f3di4qhie45fz4rea';
+        rawPaymentAmount = await _convertAmountToRaw(pending.size);
+        paymentAddr = _getPaymentAddress(rawPaymentAmount);
         const startBlockCount = await _getBlockCount(paymentAddr);
         _sendPaymentAddress(ws, paymentAddr, rawPaymentAmount);
         await _pollForPayment(paymentAddr, rawPaymentAmount, startBlockCount);
         _saveBoard(ws, pending, board);
-        ws.send(
-            JSON.stringify({
-                success: 'true',
-            })
-        );
+        _clearPendingPayment(paymentAddr, rawPaymentAmount);
         return Promise.resolve();
     } catch (err) {
+        _clearPendingPayment(paymentAddr, rawPaymentAmount);
         ws.send(
             JSON.stringify({
                 error: err.message,
