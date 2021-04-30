@@ -19,17 +19,23 @@ const _pollAddress = async (addr, timeout): Promise<void> => {
     let breakIteration;
     let startBlockCount;
     let refreshBlockCount = true;
+    let pendingPayments = 0;
 
     while (true) {
         await sleep(timeout);
-        const pendingPayments = PENDING_PAYMENTS[addr].size;
+        const transactionCountChanged = PENDING_PAYMENTS[addr].size !== pendingPayments;
+        pendingPayments = PENDING_PAYMENTS[addr].size;
 
         if (!pendingPayments) {
             refreshBlockCount = true; // Only refresh block count when there are no pending payments.
             continue;
         }
 
-        console.log(`[INFO]: ${pendingPayments} pending payments for address ${addr}; checking for payment.`);
+        if (transactionCountChanged) {
+            console.log(`[INFO]: (${pendingPayments}) pending payments for address ${addr}; poll for payment.`);
+        } else {
+            console.log(`[INFO]: (${pendingPayments}) ${addr}`);
+        }
 
         breakIteration = false;
         if (refreshBlockCount) {
@@ -43,10 +49,10 @@ const _pollAddress = async (addr, timeout): Promise<void> => {
             refreshBlockCount = false;
         }
 
-        const recentBlocks = await getAccountHistory(addr, startBlockCount).catch((err) => {
+        const recentBlocks = (await getAccountHistory(addr, startBlockCount).catch((err) => {
             LOG(ACCOUNT_HISTORY_ERROR(addr, startBlockCount), err);
             breakIteration = true;
-        }) as AccountHistoryResponse;
+        })) as AccountHistoryResponse;
         if (breakIteration) {
             continue;
         }

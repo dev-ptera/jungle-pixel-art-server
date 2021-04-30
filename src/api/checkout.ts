@@ -1,16 +1,24 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { makeKey } from './util';
 import { PAYMENT_ADDRESSES, PENDING_PAYMENTS } from '../app.config';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 import { first } from 'rxjs/operators';
+const WebSocket = require('ws');
 
 const MAX_ATTEMPTS = 60; // TODO: timeout request
 const SUCCESS_STATUS = 1000;
 const ERROR_STATUS = 1011;
-const CLIENT_CLOSED_PAYMENT_WINDOW = 4580;
 const CLIENT_CLOSED_BROWSER = 1001;
+const CLIENT_CLOSED_PAYMENT_WINDOW = 4580;
+const TIMEOUT_STATUS = 4581;
+
+type Tx = {
+    paymentAddress: string;
+    rawPaymentAmount: string;
+    listeners: Subscription[];
+};
 
 // Convert the user edits into a map which we can save.
 const _parseMsg = (msg: string): Map<string, string> => {
@@ -68,9 +76,11 @@ const _sendPaymentAddress = (ws, addr, amount): void => {
     );
 };
 
-const _listenForIncomingBlocks = (paymentAddr, rawPaymentAmount, subs: Subscription[]): Observable<any> => {
+const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
+    const paymentAddr = tx.paymentAddress;
+    const rawPaymentAmount = tx.rawPaymentAmount;
     return new Observable((event) => {
-        subs.push(
+        tx.listeners.push(
             newBlocksSubject.subscribe((history) => {
                 if (history.account === paymentAddr) {
                     for (const block of history.history) {
@@ -97,79 +107,105 @@ const _saveBoard = (ws, pending: Map<string, string>, board): void => {
     );
 };
 
-const _clearPendingPayment = (addr: string, rawAmount: string, subscriptions: Subscription[]): void => {
-    if (PENDING_PAYMENTS[addr] && PENDING_PAYMENTS[addr].has(rawAmount)) {
-        PENDING_PAYMENTS[addr].delete(rawAmount);
+const _clearPendingPayment = (tx: Tx): void => {
+    const paymentAddr = tx.paymentAddress;
+    const rawPaymentAmount = tx.rawPaymentAmount;
+    if (PENDING_PAYMENTS[paymentAddr] && PENDING_PAYMENTS[paymentAddr].has(rawPaymentAmount)) {
+        PENDING_PAYMENTS[paymentAddr].delete(rawPaymentAmount);
     }
-    for (const sub of subscriptions) {
+    for (const sub of tx.listeners) {
         if (!sub.closed) {
             sub.unsubscribe();
         }
     }
 };
 
-export const checkout = async (ws: WebSocket, msg, board, closeSubject): Promise<void> => {
-    let paymentAddr;
-    let rawPaymentAmount;
-    let txListeners: Subscription[] = [closeSubject];
-
-    try {
-        /* Listen for WebSocket closing. If client terminates connection, we end the pending transaction. */
-        closeSubject.pipe(first()).subscribe((status) => {
-            if (status === CLIENT_CLOSED_PAYMENT_WINDOW) {
-                console.log(
-                    `[INFO]: Web socket closed by the client [PAYMENT_WINDOW]; canceling transaction for address ${paymentAddr}.`
-                );
-            }
-            if (status === CLIENT_CLOSED_BROWSER) {
-                console.log(
-                    `[INFO]: Web socket closed by the client [CLOSED_BROWSER]; canceling transaction for address ${paymentAddr}.`
-                );
-            }
-            if (status === SUCCESS_STATUS) {
-                console.log(
-                    `[INFO]: Web socket closed with SUCCESS by the server; transaction complete for address ${paymentAddr}.`
-                );
-            }
-            if (status === ERROR_STATUS) {
-                console.log(
-                    `[INFO]: Web socket closed with ERROR by the server; transaction canceled for address ${paymentAddr}.`
-                );
-            }
-            _clearPendingPayment(paymentAddr, rawPaymentAmount, txListeners);
-        });
-
-        /* Parse user-provided pixel map. */
-        const pending = _parseMsg(msg);
-
-        /* If the board has any conflicting pixels, send back an error. */
-        const redrawn = _checkRedrawn(pending, board);
-        if (redrawn.size > 0) {
-            _handleRedrawn(redrawn);
-        }
-
-        /* Get payment amount and payment address */
-        rawPaymentAmount = await _convertAmountToRaw(pending.size);
-        paymentAddr = _getPaymentAddress(rawPaymentAmount);
-
-        /* Send payment address back to the client. */
-        _sendPaymentAddress(ws, paymentAddr, rawPaymentAmount);
-
-        /* Listen for payment, then save the board and send updated board back to client. */
-        txListeners.push(
-            _listenForIncomingBlocks(paymentAddr, rawPaymentAmount, txListeners).subscribe(() => {
-                _saveBoard(ws, pending, board);
-                ws.close(SUCCESS_STATUS);
-                return Promise.resolve();
-            })
-        );
-    } catch (err) {
+const _handleErr = (ws: WebSocket, err: Error, status: number): Promise<void> => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(
             JSON.stringify({
                 error: err.message,
             })
         );
-        ws.close(ERROR_STATUS);
-        return Promise.reject(err);
+        ws.close(status);
     }
+    return Promise.reject(err);
+};
+
+const _listenForWebsocketClose = (tx: Tx, closeSubject: Subject<number>) => {
+    closeSubject.pipe(first()).subscribe((status) => {
+        if (status === CLIENT_CLOSED_PAYMENT_WINDOW) {
+            console.log(
+                `[INFO]: Web socket closed by the client [PAYMENT_WINDOW]; canceling transaction for address ${tx.paymentAddress}.`
+            );
+        }
+        if (status === CLIENT_CLOSED_BROWSER) {
+            console.log(
+                `[INFO]: Web socket closed by the client [CLOSED_BROWSER]; canceling transaction for address ${tx.paymentAddress}.`
+            );
+        }
+        if (status === SUCCESS_STATUS) {
+            console.log(
+                `[INFO]: Web socket closed with SUCCESS by the server; transaction complete for address ${tx.paymentAddress}.`
+            );
+        }
+        if (status === ERROR_STATUS) {
+            console.log(
+                `[INFO]: Web socket closed with ERROR by the server; transaction canceled for address ${tx.paymentAddress}.`
+            );
+        }
+        if (status === TIMEOUT_STATUS) {
+            console.log(
+                `[INFO]: Web socket closed with ERROR by the server; transaction timeout for address ${tx.paymentAddress}.`
+            );
+        }
+        _clearPendingPayment(tx);
+    });
+};
+
+export const checkout = async (ws: WebSocket, msg, board, closeSubject): Promise<void> => {
+    const tx: Tx = {
+        paymentAddress: undefined,
+        rawPaymentAmount: undefined,
+        listeners: [closeSubject],
+    };
+    return new Promise(async (resolve, reject) => {
+        try {
+            /* Listen for WebSocket closing. If client terminates connection, we end the pending transaction. */
+            _listenForWebsocketClose(tx, closeSubject);
+
+            /* Parse user-provided pixel map. */
+            const pending = _parseMsg(msg);
+
+            /* If the board has any conflicting pixels, send back an error. */
+            const redrawn = _checkRedrawn(pending, board);
+            if (redrawn.size > 0) {
+                _handleRedrawn(redrawn);
+            }
+
+            /* Get payment amount and payment address */
+            tx.rawPaymentAmount = await _convertAmountToRaw(pending.size);
+            tx.paymentAddress = _getPaymentAddress(tx.rawPaymentAmount);
+
+            /* Send payment address back to the client. */
+            _sendPaymentAddress(ws, tx.paymentAddress, tx.rawPaymentAmount);
+
+            /* Listen for payment timeouts. */
+            setTimeout(() => {
+                const err = new Error('timeout');
+                _handleErr(ws, err, TIMEOUT_STATUS).catch(reject);
+            }, 1000 * 10);
+
+            /* Listen for payment, then save the board and send updated board back to client. */
+            tx.listeners.push(
+                _listenForIncomingBlocks(tx).subscribe(() => {
+                    _saveBoard(ws, pending, board);
+                    ws.close(SUCCESS_STATUS);
+                    return resolve();
+                })
+            );
+        } catch (err) {
+            _handleErr(ws, err, ERROR_STATUS).catch(reject);
+        }
+    });
 };

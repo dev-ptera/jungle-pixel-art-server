@@ -40,9 +40,7 @@ app.ws('/payment', (ws) => {
     const closeSubject = new Subject<number>();
 
     ws.on('message', async (msg) => {
-        await checkout(ws, msg, drawnPixels, closeSubject).catch((err) => {
-            console.error(err);
-        });
+        await checkout(ws, msg, drawnPixels, closeSubject).catch(() => {});
     });
 
     ws.on('close', (status: number) => {
