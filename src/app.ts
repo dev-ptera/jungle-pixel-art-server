@@ -5,7 +5,7 @@ import { isProduction, URL_WHITE_LIST } from './app.config';
 import { checkout } from './api/checkout';
 import { makeKey } from './api/util';
 import { poll } from './api/poll';
-import {Subject} from "rxjs";
+import { Subject } from 'rxjs';
 
 const http = require('http');
 const appBase = express();
@@ -37,8 +37,7 @@ app.get('/board', (req, res) => {
 });
 
 app.ws('/payment', (ws) => {
-
-    const closeSubject = new Subject<void>();
+    const closeSubject = new Subject<number>();
 
     ws.on('message', async (msg) => {
         await checkout(ws, msg, drawnPixels, closeSubject).catch((err) => {
@@ -46,9 +45,8 @@ app.ws('/payment', (ws) => {
         });
     });
 
-    ws.on('close', () => {
-        console.log('WebSocket was closed');
-        closeSubject.next();
+    ws.on('close', (status: number) => {
+        closeSubject.next(status);
     });
 });
 
