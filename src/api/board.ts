@@ -1,4 +1,4 @@
-import {DRAWN_PIXELS} from "../app.config";
+import { DRAWN_PIXELS } from '../app.config';
 
 export const getJsonBoard = (): string => {
     const data = {};
@@ -6,7 +6,7 @@ export const getJsonBoard = (): string => {
         data[key] = DRAWN_PIXELS.get(key);
     }
     return JSON.stringify(data);
-}
+};
 
 export const getBoard = (res): void => {
     const data = {};
@@ -14,4 +14,4 @@ export const getBoard = (res): void => {
         data[key] = DRAWN_PIXELS.get(key);
     }
     res.send(getJsonBoard());
-}
+};

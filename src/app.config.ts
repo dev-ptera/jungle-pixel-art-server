@@ -1,5 +1,5 @@
 import { NanoClient } from '@dev-ptera/nano-node-rpc';
-import {initPendingPaymentSets, makeKey} from './api/util';
+import { initPendingPaymentSets, makeKey } from './api/util';
 
 const args = process.argv.slice(2);
 

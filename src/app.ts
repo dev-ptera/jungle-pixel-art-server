@@ -6,7 +6,7 @@ import { checkout } from './api/checkout';
 import { makeKey } from './api/util';
 import { poll } from './api/poll';
 import { Subject } from 'rxjs';
-import {getBoard} from "./api/board";
+import { getBoard } from './api/board';
 
 const http = require('http');
 const appBase = express();

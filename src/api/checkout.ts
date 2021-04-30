@@ -1,11 +1,11 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { makeKey } from './util';
-import {DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS} from '../app.config';
+import { DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS } from '../app.config';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 import { first } from 'rxjs/operators';
-import {getJsonBoard} from "./board";
+import { getJsonBoard } from './board';
 const WebSocket = require('ws');
 
 const MAX_ATTEMPTS = 60; // TODO: timeout request
@@ -105,7 +105,7 @@ const _saveBoard = (ws, pending: Map<string, string>): void => {
     ws.send(
         JSON.stringify({
             success: true,
-            board: getJsonBoard()
+            board: getJsonBoard(),
         })
     );
 };
