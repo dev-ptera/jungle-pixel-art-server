@@ -1,10 +1,11 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { makeKey } from './util';
-import { PAYMENT_ADDRESSES, PENDING_PAYMENTS } from '../app.config';
+import {DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS} from '../app.config';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 import { first } from 'rxjs/operators';
+import {getJsonBoard} from "./board";
 const WebSocket = require('ws');
 
 const MAX_ATTEMPTS = 60; // TODO: timeout request
@@ -32,11 +33,11 @@ const _parseMsg = (msg: string): Map<string, string> => {
 };
 
 // Check to see if the board has any conflicting edits.
-const _checkRedrawn = (pending: Map<string, string>, board: Map<string, string>): Map<string, string> => {
+const _checkRedrawn = (pending: Map<string, string>): Map<string, string> => {
     const redrawn = new Map<string, string>();
     for (const key of pending.keys()) {
-        if (board.has(key)) {
-            redrawn.set(key, board.get(key));
+        if (DRAWN_PIXELS.has(key)) {
+            redrawn.set(key, DRAWN_PIXELS.get(key));
         }
     }
     return redrawn;
@@ -96,13 +97,15 @@ const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
     });
 };
 
-const _saveBoard = (ws, pending: Map<string, string>, board): void => {
+const _saveBoard = (ws, pending: Map<string, string>): void => {
+    // TODO: Firebase
     for (const key of pending.keys()) {
-        board.set(key, pending.get(key));
+        DRAWN_PIXELS.set(key, pending.get(key));
     }
     ws.send(
         JSON.stringify({
             success: true,
+            board: getJsonBoard()
         })
     );
 };
@@ -163,7 +166,7 @@ const _listenForWebsocketClose = (tx: Tx, closeSubject: Subject<number>) => {
     });
 };
 
-export const checkout = async (ws: WebSocket, msg, board, closeSubject): Promise<void> => {
+export const checkout = async (ws: WebSocket, msg, closeSubject): Promise<void> => {
     const tx: Tx = {
         paymentAddress: undefined,
         rawPaymentAmount: undefined,
@@ -178,7 +181,7 @@ export const checkout = async (ws: WebSocket, msg, board, closeSubject): Promise
             const pending = _parseMsg(msg);
 
             /* If the board has any conflicting pixels, send back an error. */
-            const redrawn = _checkRedrawn(pending, board);
+            const redrawn = _checkRedrawn(pending);
             if (redrawn.size > 0) {
                 _handleRedrawn(redrawn);
             }
@@ -194,12 +197,12 @@ export const checkout = async (ws: WebSocket, msg, board, closeSubject): Promise
             setTimeout(() => {
                 const err = new Error('timeout');
                 _handleErr(ws, err, TIMEOUT_STATUS).catch(reject);
-            }, 1000 * 10);
+            }, TIMEOUT_MS);
 
             /* Listen for payment, then save the board and send updated board back to client. */
             tx.listeners.push(
                 _listenForIncomingBlocks(tx).subscribe(() => {
-                    _saveBoard(ws, pending, board);
+                    _saveBoard(ws, pending);
                     ws.close(SUCCESS_STATUS);
                     return resolve();
                 })

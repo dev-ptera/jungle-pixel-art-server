@@ -1,5 +1,5 @@
 import { NanoClient } from '@dev-ptera/nano-node-rpc';
-import { initPendingPaymentSets } from './api/util';
+import {initPendingPaymentSets, makeKey} from './api/util';
 
 const args = process.argv.slice(2);
 
@@ -15,3 +15,7 @@ export const PAYMENT_ADDRESSES = [
 ];
 
 export const PENDING_PAYMENTS = initPendingPaymentSets();
+export const DRAWN_PIXELS = new Map<string, string>();
+export const TIMEOUT_MS = 1000 * 60;
+DRAWN_PIXELS.set(makeKey(115, 451), '#259a36');
+DRAWN_PIXELS.set(makeKey(145, 463), '#259a36');

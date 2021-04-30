@@ -6,11 +6,12 @@ import { checkout } from './api/checkout';
 import { makeKey } from './api/util';
 import { poll } from './api/poll';
 import { Subject } from 'rxjs';
+import {getBoard} from "./api/board";
 
 const http = require('http');
 const appBase = express();
 let wsInstance = expressWs(appBase);
-let { app } = wsInstance; // let app = wsInstance.app;
+let { app } = wsInstance;
 
 const corsOptions = {
     origin: function (origin, callback) {
@@ -22,25 +23,13 @@ const corsOptions = {
     },
 };
 
-const drawnPixels = new Map<string, string>();
-
-drawnPixels.set(makeKey(115, 451), '#259a36');
-drawnPixels.set(makeKey(145, 463), '#259a36');
-
 app.use(cors(corsOptions));
-app.get('/board', (req, res) => {
-    const data = {};
-    for (const key of drawnPixels.keys()) {
-        data[key] = drawnPixels.get(key);
-    }
-    res.send(JSON.stringify(data));
-});
-
+app.get('/board', (req, res) => getBoard(res));
 app.ws('/payment', (ws) => {
     const closeSubject = new Subject<number>();
 
     ws.on('message', async (msg) => {
-        await checkout(ws, msg, drawnPixels, closeSubject).catch(() => {});
+        await checkout(ws, msg, closeSubject).catch(() => {});
     });
 
     ws.on('close', (status: number) => {
