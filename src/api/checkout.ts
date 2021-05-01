@@ -86,7 +86,8 @@ const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
                 if (history.account === paymentAddr) {
                     for (const block of history.history) {
                         if (block.type === 'receive' && block.amount === rawPaymentAmount) {
-                            console.log(`[INFO]: Payment received! ${paymentAddr} ${rawPaymentAmount} ${block.height}`);
+                            console.log(`[INFO]: Payment received! ${paymentAddr} ${rawPaymentAmount} ${block.hash}`);
+                            _clearPendingPayment(tx);
                             event.next();
                             break;
                         }
@@ -110,16 +111,19 @@ const _saveBoard = (ws, pending: Map<string, string>): void => {
     );
 };
 
+const _clearTxListeners = (tx: Tx): void => {
+    for (const sub of tx.listeners) {
+        if (!sub.closed) {
+            sub.unsubscribe();
+        }
+    }
+};
+
 const _clearPendingPayment = (tx: Tx): void => {
     const paymentAddr = tx.paymentAddress;
     const rawPaymentAmount = tx.rawPaymentAmount;
     if (PENDING_PAYMENTS[paymentAddr] && PENDING_PAYMENTS[paymentAddr].has(rawPaymentAmount)) {
         PENDING_PAYMENTS[paymentAddr].delete(rawPaymentAmount);
-    }
-    for (const sub of tx.listeners) {
-        if (!sub.closed) {
-            sub.unsubscribe();
-        }
     }
 };
 
@@ -163,6 +167,7 @@ const _listenForWebsocketClose = (tx: Tx, closeSubject: Subject<number>) => {
             );
         }
         _clearPendingPayment(tx);
+        _clearTxListeners(tx);
     });
 };
 
