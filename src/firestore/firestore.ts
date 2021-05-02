@@ -1,10 +1,10 @@
-import {serviceAccount} from "./serviceAccountKey";
-import {DRAWN_PIXELS} from "../app.config";
+import { serviceAccount } from './serviceAccountKey';
+import { DRAWN_PIXELS } from '../app.config';
 const admin = require('firebase-admin');
 const BOARD_NAME = 'board2021';
 
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
@@ -23,7 +23,7 @@ export const writeTx = async (txHash: string, pixels: Map<string, string>) => {
     collection['pixels'] = pixelCollectionObj;
 
     await docRef.set(collection);
-}
+};
 
 export const readBoard = async (): Promise<void> => {
     const snapshot = await db.collection(BOARD_NAME).get();
@@ -34,4 +34,4 @@ export const readBoard = async (): Promise<void> => {
         }
     });
     return;
-}
+};

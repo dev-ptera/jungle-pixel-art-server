@@ -6,7 +6,7 @@ import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 import { first } from 'rxjs/operators';
 import { getJsonBoard } from './board';
-import {writeTx} from "../firestore/firestore";
+import { writeTx } from '../firestore/firestore';
 const WebSocket = require('ws');
 
 const MAX_ATTEMPTS = 60; // TODO: timeout request
