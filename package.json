@@ -6,8 +6,9 @@
     },
     "scripts": {
         "build": "tsc",
+        "build:prod": "tsc",
         "start": "yarn build && node dist/app.js ",
-        "start:prod": "yarn build && node dist/app.js 'production'",
+        "start:prod": "node dist/app.js 'production'",
         "prettier": "prettier \"src/**/**.{ts,js}\" --write"
     },
     "dependencies": {
@@ -16,6 +17,7 @@
         "cors": "^2.8.5",
         "express": "^4.16.4",
         "express-ws": "^4.0.0",
+        "firebase-admin": "^9.7.0",
         "rxjs": "^6.6.7"
     },
     "devDependencies": {

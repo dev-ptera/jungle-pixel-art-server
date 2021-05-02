@@ -6,6 +6,7 @@ import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
 import { first } from 'rxjs/operators';
 import { getJsonBoard } from './board';
+import {writeTx} from "../firestore/firestore";
 const WebSocket = require('ws');
 
 const MAX_ATTEMPTS = 60; // TODO: timeout request
@@ -77,7 +78,7 @@ const _sendPaymentAddress = (ws, addr, amount): void => {
     );
 };
 
-const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
+const _listenForIncomingBlocks = (tx: Tx): Observable<string> => {
     const paymentAddr = tx.paymentAddress;
     const rawPaymentAmount = tx.rawPaymentAmount;
     return new Observable((event) => {
@@ -88,7 +89,7 @@ const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
                         if (block.type === 'receive' && block.amount === rawPaymentAmount) {
                             console.log(`[INFO]: Payment received! ${paymentAddr} ${rawPaymentAmount} ${block.hash}`);
                             _clearPendingPayment(tx);
-                            event.next();
+                            event.next(block.hash);
                             break;
                         }
                     }
@@ -98,8 +99,8 @@ const _listenForIncomingBlocks = (tx: Tx): Observable<any> => {
     });
 };
 
-const _saveBoard = (ws, pending: Map<string, string>): void => {
-    // TODO: Firebase
+const _saveBoard = async (ws, hash: string, pending: Map<string, string>): Promise<any> => {
+    await writeTx(hash, pending);
     for (const key of pending.keys()) {
         DRAWN_PIXELS.set(key, pending.get(key));
     }
@@ -109,6 +110,7 @@ const _saveBoard = (ws, pending: Map<string, string>): void => {
             board: getJsonBoard(),
         })
     );
+    return Promise.resolve();
 };
 
 const _clearTxListeners = (tx: Tx): void => {
@@ -206,8 +208,8 @@ export const checkout = async (ws: WebSocket, msg, closeSubject): Promise<void> 
 
             /* Listen for payment, then save the board and send updated board back to client. */
             tx.listeners.push(
-                _listenForIncomingBlocks(tx).subscribe(() => {
-                    _saveBoard(ws, pending);
+                _listenForIncomingBlocks(tx).subscribe(async (hash: string) => {
+                    await _saveBoard(ws, hash, pending);
                     ws.close(SUCCESS_STATUS);
                     return resolve();
                 })

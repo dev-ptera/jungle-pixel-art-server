@@ -1,12 +1,13 @@
 import * as express from 'express';
 import * as cors from 'cors';
 import * as expressWs from 'express-ws';
-import { isProduction, URL_WHITE_LIST } from './app.config';
+import {DRAWN_PIXELS, isProduction, URL_WHITE_LIST} from './app.config';
 import { checkout } from './api/checkout';
 import { makeKey } from './api/util';
 import { poll } from './api/poll';
 import { Subject } from 'rxjs';
 import { getBoard } from './api/board';
+import {readBoard} from "./firestore/firestore";
 
 const http = require('http');
 const appBase = express();
@@ -42,6 +43,7 @@ const server = http.createServer(app).listen(port, () => {
     console.log(`Running jungle-pixel-art-server on port ${port}.`);
     console.log(`Production mode enabled? : ${isProduction()}`);
     poll();
+    readBoard();
 });
 expressWs(app, server);
 
