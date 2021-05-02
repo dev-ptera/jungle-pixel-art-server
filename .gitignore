@@ -71,5 +71,5 @@ node_modules/
 # dotenv environment variables file
 .env
 
-
-raw-secret.ts
+app.yaml
+local-env.sh

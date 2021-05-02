@@ -7,7 +7,7 @@
     "scripts": {
         "build": "tsc",
         "build:prod": "tsc",
-        "start": "yarn build && node dist/app.js ",
+        "start": "yarn build && sh local-env.sh",
         "start:prod": "node dist/app.js 'production'",
         "prettier": "prettier \"src/**/**.{ts,js}\" --write"
     },
