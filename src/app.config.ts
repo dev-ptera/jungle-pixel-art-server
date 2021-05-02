@@ -7,7 +7,7 @@ export const isProduction = (): boolean => args && args[0] === 'production';
 export const URL_WHITE_LIST = [
     'https://jungle-pixel-art.web.app',
     'http://localhost:8080',
-    'https://junglepixelart.com/',
+    'https://junglepixelart.com',
 ];
 export const RPC_SERVER_PROD_URL = 'http://108.39.249.5:1120/banano-rpc';
 export const RPC_SERVER_DEV_URL = 'http://localhost:1119/banano-rpc';
