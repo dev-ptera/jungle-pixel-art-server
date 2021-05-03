@@ -1,6 +1,6 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { makeKey } from './util';
-import { DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS } from '../app.config';
+import {COST_PER_PIXEL, DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS} from '../app.config';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';
@@ -9,7 +9,6 @@ import { getJsonBoard } from './board';
 import { writeTx } from '../firestore/firestore';
 const WebSocket = require('ws');
 
-const MAX_ATTEMPTS = 60; // TODO: timeout request
 const SUCCESS_STATUS = 1000;
 const ERROR_STATUS = 1011;
 const CLIENT_CLOSED_BROWSER = 1001;
@@ -69,11 +68,12 @@ const _getPaymentAddress = (amount: string): string => {
     throw new Error(PAYMENT_SETS_FULL);
 };
 
-const _sendPaymentAddress = (ws, addr, amount): void => {
+const _sendPaymentAddress = (ws, addr: string, raw, cost: number): void => {
     ws.send(
         JSON.stringify({
             address: addr,
-            raw: amount,
+            raw,
+            cost,
         })
     );
 };
@@ -194,11 +194,12 @@ export const checkout = async (ws: WebSocket, msg, closeSubject): Promise<void> 
             }
 
             /* Get payment amount and payment address */
-            tx.rawPaymentAmount = await _convertAmountToRaw(pending.size);
+            const cost = Math.ceil(pending.size * COST_PER_PIXEL);
+            tx.rawPaymentAmount = await _convertAmountToRaw(cost);
             tx.paymentAddress = _getPaymentAddress(tx.rawPaymentAmount);
 
             /* Send payment address back to the client. */
-            _sendPaymentAddress(ws, tx.paymentAddress, tx.rawPaymentAmount);
+            _sendPaymentAddress(ws, tx.paymentAddress, tx.rawPaymentAmount, cost);
 
             /* Listen for payment timeouts. */
             setTimeout(() => {

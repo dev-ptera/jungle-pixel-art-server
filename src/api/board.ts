@@ -1,11 +1,11 @@
-import { DRAWN_PIXELS } from '../app.config';
+import {COST_PER_PIXEL, DRAWN_PIXELS} from '../app.config';
 
-export const getJsonBoard = (): string => {
+export const getJsonBoard = (): any => {
     const data = {};
     for (const key of DRAWN_PIXELS.keys()) {
         data[key] = DRAWN_PIXELS.get(key);
     }
-    return JSON.stringify(data);
+    return data;
 };
 
 export const getBoard = (res): void => {
@@ -13,5 +13,8 @@ export const getBoard = (res): void => {
     for (const key of DRAWN_PIXELS.keys()) {
         data[key] = DRAWN_PIXELS.get(key);
     }
-    res.send(getJsonBoard());
+    res.send({
+        pixels: getJsonBoard(),
+        costPerPixel: COST_PER_PIXEL
+    });
 };

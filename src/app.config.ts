@@ -21,3 +21,4 @@ export const PAYMENT_ADDRESSES = [
 export const PENDING_PAYMENTS = initPendingPaymentSets();
 export const DRAWN_PIXELS = new Map<string, string>();
 export const TIMEOUT_MS = 1000 * 60;
+export const COST_PER_PIXEL = .005;
