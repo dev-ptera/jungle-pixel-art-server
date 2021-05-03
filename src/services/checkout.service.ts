@@ -1,12 +1,20 @@
-import { convertBananoToRaw } from '../rpc/mrai-to-raw';
-import { makeKey } from './util';
-import { COST_PER_PIXEL, DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS } from '../app.config';
+import { makeKey } from './utils';
 import { Observable, Subject, Subscription } from 'rxjs';
-import { newBlocksSubject } from './poll';
-import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL, PAYMENT_TIMEOUT } from '../error';
+import { newBlocksSubject } from './poll.service';
 import { first } from 'rxjs/operators';
-import { getJsonBoard } from './board';
+import { getJsonBoard } from './board.service';
 import { writeTx } from '../firestore/firestore';
+import {
+    CONFLICTING_PIXEL_BOARD,
+    COST_PER_PIXEL,
+    DRAWN_PIXELS,
+    PAYMENT_ADDRESSES,
+    PAYMENT_SETS_FULL,
+    PAYMENT_TIMEOUT,
+    PENDING_PAYMENTS,
+    TIMEOUT_MS,
+} from '../config';
+import { convertBananoToRaw } from '../rpc';
 const WebSocket = require('ws');
 
 const SUCCESS_STATUS = 1000;
@@ -174,7 +182,7 @@ const _listenForWebsocketClose = (tx: Tx, closeSubject: Subject<number>) => {
     });
 };
 
-export const checkout = async (ws: WebSocket, msg, closeSubject): Promise<void> => {
+export const checkoutService = async (ws: WebSocket, msg, closeSubject): Promise<void> => {
     const tx: Tx = {
         paymentAddress: undefined,
         rawPaymentAmount: undefined,

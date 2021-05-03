@@ -1,8 +1,7 @@
-import { nanoClient } from '../app.config';
+import { NANO_CLIENT } from '../../config';
 
 export const convertBananoToRaw = async (amount: number): Promise<string> =>
-    nanoClient
-        .mrai_to_raw(String(amount))
+    NANO_CLIENT.mrai_to_raw(String(amount))
         .then((data) => {
             return Promise.resolve(data.amount);
         })

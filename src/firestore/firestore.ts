@@ -1,5 +1,5 @@
 import { serviceAccount } from './serviceAccountKey';
-import { DRAWN_PIXELS } from '../app.config';
+import { DRAWN_PIXELS } from '../config';
 const admin = require('firebase-admin');
 const BOARD_NAME = 'board2021';
 
