@@ -1,6 +1,6 @@
 import { convertBananoToRaw } from '../rpc/mrai-to-raw';
 import { makeKey } from './util';
-import {COST_PER_PIXEL, DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS} from '../app.config';
+import { COST_PER_PIXEL, DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS } from '../app.config';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
 import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL } from '../error';

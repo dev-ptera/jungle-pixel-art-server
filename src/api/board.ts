@@ -1,4 +1,4 @@
-import {COST_PER_PIXEL, DRAWN_PIXELS} from '../app.config';
+import { COST_PER_PIXEL, DRAWN_PIXELS } from '../app.config';
 
 export const getJsonBoard = (): any => {
     const data = {};
@@ -15,6 +15,6 @@ export const getBoard = (res): void => {
     }
     res.send({
         pixels: getJsonBoard(),
-        costPerPixel: COST_PER_PIXEL
+        costPerPixel: COST_PER_PIXEL,
     });
 };
