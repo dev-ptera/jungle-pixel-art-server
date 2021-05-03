@@ -1,5 +1,3 @@
-import { PAYMENT_ADDRESSES } from '../app.config';
-
 export const sleep = (ms) =>
     new Promise((resolve) => {
         setTimeout(resolve, ms);
@@ -7,9 +5,9 @@ export const sleep = (ms) =>
 
 export const makeKey = (x: number, y: number) => `${x},${y}`;
 
-export const initPendingPaymentSets = (): Array<Set<string>> => {
+export const initPendingPaymentSets = (paymentAddrs: string[]): Array<Set<string>> => {
     const pendingPayments: Array<Set<string>> = [];
-    for (const paymentAddr of PAYMENT_ADDRESSES) {
+    for (const paymentAddr of paymentAddrs) {
         pendingPayments[paymentAddr] = new Set<string>();
     }
     return pendingPayments;
