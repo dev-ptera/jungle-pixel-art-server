@@ -3,7 +3,7 @@ import { makeKey } from './util';
 import { COST_PER_PIXEL, DRAWN_PIXELS, PAYMENT_ADDRESSES, PENDING_PAYMENTS, TIMEOUT_MS } from '../app.config';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { newBlocksSubject } from './poll';
-import {CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL, PAYMENT_TIMEOUT} from '../error';
+import { CONFLICTING_PIXEL_BOARD, PAYMENT_SETS_FULL, PAYMENT_TIMEOUT } from '../error';
 import { first } from 'rxjs/operators';
 import { getJsonBoard } from './board';
 import { writeTx } from '../firestore/firestore';
@@ -74,7 +74,7 @@ const _sendPaymentAddress = (ws, addr: string, raw, cost: number): void => {
             address: addr,
             raw,
             cost,
-            timeout: TIMEOUT_MS
+            timeout: TIMEOUT_MS,
         })
     );
 };
