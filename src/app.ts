@@ -5,7 +5,7 @@ import { Subject } from 'rxjs';
 import { readBoard } from './firestore/firestore';
 import { pollService } from './services/poll.service';
 import { checkoutService } from './services/checkout.service';
-import { isProduction, URL_WHITE_LIST } from './config';
+import { IS_PRODUCTION, URL_WHITE_LIST } from './config';
 import { getBoard } from './services';
 
 const http = require('http');
@@ -15,7 +15,7 @@ let { app } = wsInstance;
 
 const corsOptions = {
     origin: function (origin, callback) {
-        if (isProduction() && origin && URL_WHITE_LIST.indexOf(origin) === -1) {
+        if (IS_PRODUCTION && origin && URL_WHITE_LIST.indexOf(origin) === -1) {
             callback(new Error(`Origin '${origin}' is not allowed by CORS`));
         } else {
             callback(null, true);
@@ -40,7 +40,7 @@ app.ws('/payment', (ws) => {
 const port = process.env.PORT || 3000;
 const server = http.createServer(app).listen(port, () => {
     console.log(`Running jungle-pixel-art-server on port ${port}.`);
-    console.log(`Production mode enabled? : ${isProduction()}`);
+    console.log(`Production mode enabled? : ${IS_PRODUCTION}`);
     void pollService();
     void readBoard();
 });
